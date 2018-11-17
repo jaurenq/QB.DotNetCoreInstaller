@@ -10,7 +10,7 @@ from the .NET Core team ([Install Scripts](https://docs.microsoft.com/en-us/dotn
 
 #### Benefits
 
-* Unlike the MS scripts, this tool can perform cross-platform installation.  E.g., if you're on Windows, and you need to get a MacOS shared runtime, the MS scripts won't help you.
+* Unlike the standard scripts, this tool can perform cross-platform installation.  E.g., if you're on Windows, and you need to get a MacOS shared runtime, the standard scripts won't help you.
 * Being built on .NET, the tool can be made a dependency of a .NET project and thus be used easily cross-platform as part of a project's build process.
 
 #### Downsides
