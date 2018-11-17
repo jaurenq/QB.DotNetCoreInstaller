@@ -50,11 +50,6 @@ Example: Installing shared .NET Core runtime v2.1.2 for Windows x86
 dotnet install -i ./dotnet-win-x86 -r dotnet -p win -a x86 -v 2.1.2
 ```
 
-Example: Installing shared .NET Core runtime v2.1.2 for Windows x86
-```
-dotnet install -i ./dotnet-win-x86 -r dotnet -p win -a x86 -v 2.1.2
-```
-
 Example: Get some help
 ```
 dotnet install -h
