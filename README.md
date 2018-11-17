@@ -28,9 +28,6 @@ the .NET Core team changed their distribution mechanism.
 Seriously, unless you know why you need this, you're probably looking for
 [dotnet publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish).
 
-TODO: Sections for installing into a project, installing as a global tool, and usage
-examples.  Show that it's alao a reusable class that you can call from your own code, with usage example.
-
 ### Installing Globally
 
 You'll need at least .NET Core v2.1 or higher.
