@@ -28,14 +28,13 @@ the .NET Core team changed their distribution mechanism.
 Seriously, unless you know why you need this, you're probably looking for
 [dotnet publish](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-publish).
 
-TODO: Sections for installing into a project, installing as a global tool, and usage
-examples.  Show that it's alao a reusable class that you can call from your own code, with usage example.
-
 ### Installing Globally
 
 You'll need at least .NET Core v2.1 or higher.
 
+```
 dotnet tool install -g QB.DotNetCoreInstaller
+```
 
 
 ### Usage - Command Line
@@ -51,9 +50,9 @@ Example: Installing shared .NET Core runtime v2.1.2 for Windows x86
 dotnet install -i ./dotnet-win-x86 -r dotnet -p win -a x86 -v 2.1.2
 ```
 
-Example: Installing shared .NET Core runtime v2.1.2 for Windows x86
+Example: Installing shared .NET Core runtime v2.1.1 for Linux x64
 ```
-dotnet install -i ./dotnet-win-x86 -r dotnet -p win -a x86 -v 2.1.2
+dotnet install -i ./dotnet-win-x86 -r dotnet -p linux -a x64 -v 2.1.1
 ```
 
 Example: Get some help
@@ -67,15 +66,14 @@ dotnet install -h
 Here's a minimal exmaple of using the installer as a library.
 
 ```C#
-	using DotNetCore.Tools;
+    using DotNetCore.Tools;
 
-	...
+    ...
 
     var parms = new DotNetDistributionParameters(".\dotnet-shared", DotNetPlatform.Windows, DotNetArchitecture.x64, "2.1.4")
     {
-        Force = forceOption.HasValue(),
         Runtime = DotNetRuntime.NETCore, // Or DotNetRuntime.AspNetCore to get ASP.Net
-        Log = (s) => Log(s)
+        Log = (s) => Console.WriteLine(s)
     };
 
     var installer = new DotNetCoreInstaller();
