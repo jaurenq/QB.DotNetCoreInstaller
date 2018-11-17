@@ -32,7 +32,9 @@ Seriously, unless you know why you need this, you're probably looking for
 
 You'll need at least .NET Core v2.1 or higher.
 
+```
 dotnet tool install -g QB.DotNetCoreInstaller
+```
 
 
 ### Usage - Command Line
