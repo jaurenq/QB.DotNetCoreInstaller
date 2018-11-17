@@ -10,15 +10,11 @@
     <Authors>Stephen Quattlebaum</Authors>
     <Description>Provides capabilities for installing a .NET Core shared runtime.</Description>
 
-    <!-- TODO: Do.-->
-    <PackageProjectUrl>https://github.com/jaurenq/XPNet</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/jaurenq/XPNet</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/jaurenq/QB.DotNetCoreInstaller</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jaurenq/QB.DotNetCoreInstaller</RepositoryUrl>
     <Version>0.1.3</Version>
     <Copyright>Copyright 2018 (c) Stephen Quattlebaum</Copyright>
     <PackageTags>dotnet install shared standalone</PackageTags>
-
-
-    <!--<PackageType>DotnetTool</PackageType>-->
   </PropertyGroup>
 
   <ItemGroup>

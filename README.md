@@ -8,12 +8,12 @@ standalone installations of .NET Core.
 This tool does essentially the same thing as the .NET shared-runtime install scripts
 from the .NET Core team ([Install Scripts](https://docs.microsoft.com/en-us/dotnet/core/tools/dotnet-install-script)).
 
-Benefits
+#### Benefits
 
 * Unlike the MS scripts, this tool can perform cross-platform installation.  E.g., if you're on Windows, and you need to get a MacOS shared runtime, the MS scripts won't help you.
 * Being built on .NET, the tool can be made a dependency of a .NET project and thus be used easily cross-platform as part of a project's build process.
 
-Negatives
+#### Downsides
 
 * Being built on .NET, you must already have .NET installed in order to run it.
 * If the .NET Core team changes their distribution mechanism, the official scripts will likely be updated immediately; this package will need time to catch up.
@@ -31,55 +31,63 @@ Seriously, unless you know why you need this, you're probably looking for
 TODO: Sections for installing into a project, installing as a global tool, and usage
 examples.  Show that it's alao a reusable class that you can call from your own code, with usage example.
 
+### Installing Globally
 
-### Starting a New Project with `dotnet new`
+You'll need at least .NET Core v2.1 or higher.
 
-If you don't know which option you want, you probably want this option.  You'll need the
-.NET SDK v2.0 or higher installed.  These instructions work for Windows and macOS.
+dotnet tool install -g QB.DotNetCoreInstaller
 
-1. Create a directory for your new project.
 
-2. Install or update the 'dotnet new' template for XPNet.
+### Usage - Command Line
 
+Example: Installing shared .NET Core runtime v2.1.4 for MacOS x64
 ```
-dotnet new -i XPNet.CLR.Template
-```
-
-3. Create a new plugin project.
-```
-dotnet new xpnetplugin -n YourPluginName
+dotnet install -i ./dotnet-osx-x64 -r dotnet -p osx -a x64 -v 2.1.4
 ```
 
-That will leave you with a new project (a .csproj file) and a single C# code file with an
-empty plugin class.
 
-Happy coding!
-
-### Building
-
-When you're ready to build and run your plugin, run the following command from the
-directory that contains your .csproj file.
-
+Example: Installing shared .NET Core runtime v2.1.2 for Windows x86
 ```
-dotnet publish -c Debug 
+dotnet install -i ./dotnet-win-x86 -r dotnet -p win -a x86 -v 2.1.2
 ```
 
-If you want to make a local build without immediately copying+deploying into
-a local X-Plane install, just leave off the -o parameter and its argument.
-That will build your plugin and place it in a directory on disk like so:
-
-> YourProjectRoot/bin/Debug/netcoreapp2.0/publish
-
-The exact location will vary depending on which version of .NET Core you are
-targetting, your release configuration, etc.  To deploy to X-Plane, copy the
-contents of that publish directory into a new plugin folder in X-Plane,
-download and place a compatible .NET Core hosting runtime in the same folder,
-and start X-Plane.  See the section `Installing into X-Plane` below for
-details.
-
-To build in Release mode for distribution, just specify Release configuration
-and look in the corresponding Release directory on disk for the output.
-
+Example: Installing shared .NET Core runtime v2.1.2 for Windows x86
 ```
-dotnet publish -c Release
+dotnet install -i ./dotnet-win-x86 -r dotnet -p win -a x86 -v 2.1.2
 ```
+
+Example: Get some help
+```
+dotnet install -h
+```
+
+
+### Usage - Library
+
+Here's a minimal exmaple of using the installer as a library.
+
+```C#
+	using DotNetCore.Tools;
+
+	...
+
+    var parms = new DotNetDistributionParameters(".\dotnet-shared", DotNetPlatform.Windows, DotNetArchitecture.x64, "2.1.4")
+    {
+        Force = forceOption.HasValue(),
+        Runtime = DotNetRuntime.NETCore, // Or DotNetRuntime.AspNetCore to get ASP.Net
+        Log = (s) => Log(s)
+    };
+
+    var installer = new DotNetCoreInstaller();
+    await installer.InstallStandalone(parms);
+```
+
+
+### Installing as a Package Dependency
+
+If you want to use dotnet-publish as part of your build process, you may want to
+make it a package dependency instead of requiring people who build your code to
+install the tool globally.
+
+TODO: Let's add a section describing how to do this once we've got it working :-)
+
