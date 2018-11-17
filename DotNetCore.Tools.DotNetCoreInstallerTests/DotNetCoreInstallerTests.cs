@@ -1,0 +1,225 @@
+
+using DotNetCore.Tools;
+using Moq;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Abstractions;
+using System.Threading.Tasks;
+using Xunit;
+
+namespace DotNetCoreInstallerTests
+{
+    /// <summary>
+    /// Unit tests for the <see cref="DotNetCoreInstaller"/> class.
+    /// </summary>
+    /// <remarks>
+    /// ENHANCE: This isn't a full-coverage test suite at present.
+    /// </remarks>
+    public class DotNetCoreInstallerTests : IDisposable
+    {
+        private readonly DirectoryInfo TestRoot;
+        private readonly string InstallDir;
+
+        private const string DefaultTestRelease = "2.1.0";
+
+        public DotNetCoreInstallerTests()
+        {
+            TestRoot = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), Path.GetRandomFileName()));
+            InstallDir = Path.Combine(TestRoot.FullName, "NetCoreInstallation");
+        }
+
+        public void Dispose()
+        {
+            TestRoot.Delete(recursive: true);
+        }
+
+        #region Mock Factories
+
+        private Mock<Func<Uri, string, Task>> CreateMockDownloader() => new Mock<Func<Uri, string, Task>>(MockBehavior.Strict);
+        private Mock<Func<string, string, bool, Task>> CreateMockExtractor() => new Mock<Func<string, string, bool, Task>>(MockBehavior.Strict);
+
+        private Mock<IFileSystem> CreateMockFilesystem()
+        {
+            var mockfs = new Mock<IFileSystem>(MockBehavior.Strict);
+
+            var mockPath = new Mock<PathBase>();
+
+            // Just make Path.Combine() work as you'd expect.
+            mockPath.Setup(p => p.Combine(It.IsAny<string>(), It.IsAny<string>())).Returns((string s1, string s2) => Path.Combine(s1, s2));
+            mockPath.Setup(p => p.Combine(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).Returns((string s1, string s2, string s3) => Path.Combine(s1, s2, s3));
+
+            mockfs.Setup(f => f.Directory).Returns(new Mock<DirectoryBase>(MockBehavior.Strict).Object);
+            mockfs.Setup(f => f.Path).Returns(mockPath.Object);
+            mockfs.Setup(f => f.File).Returns(new Mock<FileBase>(MockBehavior.Strict).Object);
+
+            return mockfs;
+        }
+
+        #endregion // Mock Factories
+
+        [Fact]
+        public async void InstallsNetCoreByDefault()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x64, DefaultTestRelease);
+            await InstallsMocked(parms);
+        }
+
+        [Fact]
+        public async void InstallsNetCoreExplicitly()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x64, DefaultTestRelease)
+            {
+                Runtime = DotNetRuntime.NETCore
+            };
+            await InstallsMocked(parms);
+        }
+
+        [Fact]
+        public async void InstallsAspNetCoreExplicitly()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x64, DefaultTestRelease)
+            {
+                Runtime = DotNetRuntime.AspNetCore
+            };
+            await InstallsMocked(parms);
+        }
+
+        [Fact]
+        public async void HonorsPlatform()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.MacOS, DotNetArchitecture.x64, DefaultTestRelease);
+            await InstallsMocked(parms);
+        }
+
+        [Fact]
+        public async void HonorsArchitecture()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, DefaultTestRelease);
+            await InstallsMocked(parms);
+        }
+
+        [Fact]
+        public async void HonorsVersion()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, "2.0.4");
+            await InstallsMocked(parms);
+        }
+
+        [Fact]
+        public async void ExitsEarlyIfDirectoryExists()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, DefaultTestRelease);
+
+            var logMock = new Mock<Action<string>>();
+            parms.Log = logMock.Object;
+
+            await InstallsMocked(parms, earlyExit: true);
+
+            logMock.Verify(l => l(It.Is<string>(s => s.Contains("is already installed"))));
+        }
+
+        [Fact]
+        public async void RunsEvenIfDirectoryExistsIfForced()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, DefaultTestRelease);
+            parms.Force = true;
+            await InstallsMocked(parms, forcedOverwrite: true);
+        }
+
+        [Fact]
+        public async void ThrowsIfExtractDoesNotComplete()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, DefaultTestRelease);
+            var exc = await Assert.ThrowsAsync<DotNetCoreInstallerException>(async () => await InstallsMocked(parms, failExtract: true));
+
+            Assert.Contains("failed to install", exc.Message);
+        }
+
+        private async Task InstallsMocked(DotNetDistributionParameters parms, bool earlyExit = false, bool forcedOverwrite = false, bool failExtract = false)
+        {
+            var platform = parms.Platform;
+            var arch = parms.Architecture;
+            var version = parms.Version;
+
+            var mockDownloader = CreateMockDownloader();
+            var mockExtractor = CreateMockExtractor();
+
+            var mockFilesystem = CreateMockFilesystem();
+
+            var mockFile = Mock.Get(mockFilesystem.Object.File);
+            var mockDirectory = Mock.Get(mockFilesystem.Object.Directory);
+
+            var installer = new DotNetCoreInstaller(mockDownloader.Object, mockExtractor.Object, mockFilesystem.Object);
+
+            var assetDir = (parms.Runtime == DotNetRuntime.NETCore) ? "Microsoft.NETCore.App" : "Microsoft.AspNetCore.App";
+            var expectedUri = (parms.Runtime == DotNetRuntime.NETCore)
+                ? new Uri($"{DotNetDistributionParameters.DefaultFeed}/Runtime/{version}/dotnet-runtime-{version}-{platform}-{arch}.zip")
+                : new Uri($"{DotNetDistributionParameters.DefaultFeed}/aspnetcore/Runtime/{version}/aspnetcore-runtime-{version}-{platform}-{arch}.zip");
+            var expectedInstallPath = Path.Combine(InstallDir, "shared", assetDir, version);
+
+            if (earlyExit)
+            {
+                mockDirectory.Setup(d => d.Exists(expectedInstallPath)).ReturnsInOrder(true);                               // Checking for version directory.
+            }
+            else
+            {
+                bool initiallyPresent = forcedOverwrite ? true : false;
+                bool finallyPresent = failExtract ? false : true;
+
+                mockDirectory.Setup(d => d.Exists(expectedInstallPath)).ReturnsInOrder(initiallyPresent, finallyPresent);   // Checking for version directory.
+                mockDirectory.Setup(d => d.CreateDirectory(parms.InstallDir)).Returns(value: null);                         // Creating the root install dir.
+                mockDownloader.Setup(d => d(expectedUri, It.IsAny<string>())).Returns(Task.CompletedTask);                  // Download
+                mockExtractor.Setup(e => e(It.IsAny<string>(), parms.InstallDir, forcedOverwrite))                          // Extract
+                    .Returns(Task.CompletedTask);
+                mockFile.Setup(d => d.Delete(It.IsAny<string>()));                                                          // Deleting the temporary zip file.
+            }
+
+            await installer.InstallStandalone(parms);
+
+            mockDownloader.VerifyAll();
+            mockExtractor.VerifyAll();
+        }
+
+        /// <summary>
+        /// This test runs a real download from the actual .NET distribution servers.
+        /// As such, it is set to not run by default with the rest of the test suite.
+        /// You can run it manually by running the suite with an attached debugger.
+        /// </summary>
+        [FactRunnableInDebugOnly]
+        public async void InstallsForReal()
+        {
+            var platform = DotNetPlatform.Windows;
+            var arch = DotNetArchitecture.x64;
+            var version = "2.1.0";
+
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x64, DefaultTestRelease);
+            var installer = new DotNetCoreInstaller();
+            await installer.InstallStandalone(parms);
+
+            var expectedInstallPath = Path.Combine(InstallDir, "shared", "Microsoft.NETCore.App", version);
+            Assert.True(Directory.Exists(expectedInstallPath));
+        }
+    }
+
+    public class FactRunnableInDebugOnlyAttribute : FactAttribute
+    {
+        public FactRunnableInDebugOnlyAttribute()
+        {
+            if (!Debugger.IsAttached)
+                Skip = "Only running in interactive mode.";
+        }
+    }
+
+    public static class MoqExtensions
+    {
+        public static void ReturnsInOrder<T, TResult>(
+            this Moq.Language.Flow.ISetup<T, TResult> setup,
+            params TResult[] results) where T : class
+        {
+            setup.Returns(new Queue<TResult>(results).Dequeue);
+        }
+    }
+}
+
