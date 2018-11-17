@@ -50,6 +50,11 @@ Example: Installing shared .NET Core runtime v2.1.2 for Windows x86
 dotnet install -i ./dotnet-win-x86 -r dotnet -p win -a x86 -v 2.1.2
 ```
 
+Example: Installing shared .NET Core runtime v2.1.1 for Linux x64
+```
+dotnet install -i ./dotnet-win-x86 -r dotnet -p linux -a x64 -v 2.1.1
+```
+
 Example: Get some help
 ```
 dotnet install -h
@@ -61,9 +66,9 @@ dotnet install -h
 Here's a minimal exmaple of using the installer as a library.
 
 ```C#
-	using DotNetCore.Tools;
+    using DotNetCore.Tools;
 
-	...
+    ...
 
     var parms = new DotNetDistributionParameters(".\dotnet-shared", DotNetPlatform.Windows, DotNetArchitecture.x64, "2.1.4")
     {
