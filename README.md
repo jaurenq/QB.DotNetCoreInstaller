@@ -72,9 +72,8 @@ Here's a minimal exmaple of using the installer as a library.
 
     var parms = new DotNetDistributionParameters(".\dotnet-shared", DotNetPlatform.Windows, DotNetArchitecture.x64, "2.1.4")
     {
-        Force = forceOption.HasValue(),
         Runtime = DotNetRuntime.NETCore, // Or DotNetRuntime.AspNetCore to get ASP.Net
-        Log = (s) => Log(s)
+        Log = (s) => Console.WriteLine(s)
     };
 
     var installer = new DotNetCoreInstaller();
