@@ -2,7 +2,7 @@
   "profiles": {
     "DotNetCore.Tools.DotNetCoreInstallerCli": {
       "commandName": "Project",
-      "commandLineArgs": "-v 2.1.0 -i wininstall"
+      "commandLineArgs": "-i \"winout\" -r dotnet -p osx -a x64 -v 2.1.6"
     }
   }
 }

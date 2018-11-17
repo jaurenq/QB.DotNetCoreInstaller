@@ -153,10 +153,12 @@ namespace DotNetCoreInstallerTests
 
             var installer = new DotNetCoreInstaller(mockDownloader.Object, mockExtractor.Object, mockFilesystem.Object);
 
+            var archiveExt = (parms.Platform == DotNetPlatform.Windows) ? "zip" : "tar.gz";
+
             var assetDir = (parms.Runtime == DotNetRuntime.NETCore) ? "Microsoft.NETCore.App" : "Microsoft.AspNetCore.App";
             var expectedUri = (parms.Runtime == DotNetRuntime.NETCore)
-                ? new Uri($"{DotNetDistributionParameters.DefaultFeed}/Runtime/{version}/dotnet-runtime-{version}-{platform}-{arch}.zip")
-                : new Uri($"{DotNetDistributionParameters.DefaultFeed}/aspnetcore/Runtime/{version}/aspnetcore-runtime-{version}-{platform}-{arch}.zip");
+                ? new Uri($"{DotNetDistributionParameters.DefaultFeed}/Runtime/{version}/dotnet-runtime-{version}-{platform}-{arch}.{archiveExt}")
+                : new Uri($"{DotNetDistributionParameters.DefaultFeed}/aspnetcore/Runtime/{version}/aspnetcore-runtime-{version}-{platform}-{arch}.{archiveExt}");
             var expectedInstallPath = Path.Combine(InstallDir, "shared", assetDir, version);
 
             if (earlyExit)

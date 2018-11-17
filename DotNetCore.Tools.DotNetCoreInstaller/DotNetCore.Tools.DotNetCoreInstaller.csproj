@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -7,9 +7,11 @@
     <StartupObject />
     <AssemblyName>DotNetCore.Tools.DotNetCoreInstaller</AssemblyName>
     <RootNamespace>DotNetCore.Tools</RootNamespace>
+    <DisableImplicitAssetTargetFallback>true</DisableImplicitAssetTargetFallback>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SharpCompress" Version="0.22.0" />
     <PackageReference Include="System.IO.Abstractions" Version="2.1.0.256" />
   </ItemGroup>
 

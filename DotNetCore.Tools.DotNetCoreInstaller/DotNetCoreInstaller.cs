@@ -1,8 +1,9 @@
 ﻿
+using SharpCompress.Common;
+using SharpCompress.Readers;
 using System;
 using System.IO;
 using System.IO.Abstractions;
-using System.IO.Compression;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -66,7 +67,7 @@ namespace DotNetCore.Tools
 
                 m_filesystem.Directory.CreateDirectory(parms.InstallDir);
 
-                var zipPath = m_filesystem.Path.GetTempFileName();
+                var zipPath = m_filesystem.Path.GetTempFileName() + GetArchiveExtension(parms);
 
                 await DownloadFile(uri, zipPath);
                 await ExtractFile(zipPath, parms.InstallDir, parms.Force);
@@ -114,15 +115,29 @@ namespace DotNetCore.Tools
             }
         }
 
+        private string GetArchiveExtension(DotNetDistributionParameters parms)
+        {
+            var platform = parms.Platform?.ToLower();
+
+            if (platform == DotNetPlatform.Windows)
+                return "zip";
+            else if (platform == DotNetPlatform.MacOS || platform == DotNetPlatform.Linux)
+                return "tar.gz";
+            else
+                throw new DotNetCoreInstallerException("Unhandled value for DotNetDistributionParameters.Platform: " + platform);
+        }
+
         private Uri BuildDownloadLink(DotNetDistributionParameters parms, string feed, string specificVersion, string arch)
         {
+            var ext = GetArchiveExtension(parms);
+
             switch (parms.Runtime)
             {
                 case DotNetRuntime.NETCore:
-                    return new Uri($"{feed}/Runtime/{specificVersion}/dotnet-runtime-{specificVersion}-{parms.Platform}-{arch}.zip");
+                    return new Uri($"{feed}/Runtime/{specificVersion}/dotnet-runtime-{specificVersion}-{parms.Platform}-{arch}.{ext}");
 
                 case DotNetRuntime.AspNetCore:
-                    return new Uri($"{feed}/aspnetcore/Runtime/{specificVersion}/aspnetcore-runtime-{specificVersion}-{parms.Platform}-{arch}.zip");
+                    return new Uri($"{feed}/aspnetcore/Runtime/{specificVersion}/aspnetcore-runtime-{specificVersion}-{parms.Platform}-{arch}.{ext}");
 
                 default:
                     throw new DotNetCoreInstallerException("Unhandled value for DotNetDistributionParameters.Runtime: " + parms.Runtime);
@@ -142,7 +157,7 @@ namespace DotNetCore.Tools
             }
             catch (Exception exc)
             {
-                throw new DotNetCoreInstallerException($"Failed to download from ${uri}.", exc);
+                throw new DotNetCoreInstallerException($"Failed to download from {uri}.", exc);
             }
         }
 
@@ -150,17 +165,22 @@ namespace DotNetCore.Tools
         {
             return Task.Run(() =>
             {
-                using (var zip = ZipFile.OpenRead(zipPath))
-                {
-                    foreach (var zipEntry in zip.Entries)
-                    {
-                        var path = Path.GetFullPath(Path.Combine(outPath, zipEntry.FullName));
+                var extractOptions = new ExtractionOptions() { ExtractFullPath = true, Overwrite = true };
 
+                using (var stream = File.OpenRead(zipPath))
+                {
+                    var reader = ReaderFactory.Open(stream);
+                    while (reader.MoveToNextEntry())
+                    {
+                        if (reader.Entry.IsDirectory)
+                            continue;
+
+                        var path = Path.GetFullPath(Path.Combine(outPath, reader.Entry.Key));
                         var dir = Path.GetDirectoryName(path);
                         if (!Directory.Exists(dir))
                             Directory.CreateDirectory(dir);
 
-                        zipEntry.ExtractToFile(path, overwrite: overwrite);
+                        reader.WriteEntryToDirectory(outPath, extractOptions);
                     }
                 }
             });

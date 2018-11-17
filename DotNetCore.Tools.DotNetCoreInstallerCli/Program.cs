@@ -76,7 +76,7 @@ namespace DotNetCore.Tools
         private static string White(string str) => Wrap("37;1m", str);
         private static string Wrap(string ansiCode, string str) => $"\x1b[{ansiCode}{str}\x1b[0m";
 
-        private static void Log(string str) => Console.Out.WriteLine($"> {str}");
+        private static void Log(string str) => Console.Out.WriteLine(str);
 
         private static DotNetRuntime GetRuntime(string sRuntime)
         {
