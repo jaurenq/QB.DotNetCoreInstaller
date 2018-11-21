@@ -17,12 +17,21 @@ namespace DotNetCore.Tools
             app.Name = "dotnet install";
             app.Description = "Performs standalone .NET Core installation.";
             app.HelpOption("-h|--help");
+            app.ExtendedHelpText = @"
+              The -v option is required.  Passing just a major and minor
+              version will cause the app to download the latest published
+              version in that series.
+
+              Example: ""-v 2.1.4"" will install exactly version 2.1.4
+                       ""-v 2.1"" may install 2.1.0, 2.1.6, etc. - whatever
+                       the latest in the 2.1 series is.
+            ";
 
             var installDirOption = app.Option("-i|--install-dir <INSTALL>", "Where to install", CommandOptionType.SingleValue);
             var runtimeOption = app.Option("-r|--runtime <RUNTIME>", "The runtime to install (dotnet or aspnet)", CommandOptionType.SingleValue);
             var platformOption = app.Option("-p|--platform <PLATFORM>", "The platform to install for (win, osx, linux or android)", CommandOptionType.SingleValue);
             var archOption = app.Option("-a|--arch <ARCH>", "The OS architecture to install for (x64 or x86)", CommandOptionType.SingleValue);
-            var versionOption = app.Option("-v|--version <PLATFORM>", "What version to install (e.g., 2.1.0)", CommandOptionType.SingleValue);
+            var versionOption = app.Option("-v|--version <PLATFORM>", "What version to install (e.g., 2.1 or 2.1.4)", CommandOptionType.SingleValue);
             var forceOption = app.Option("-f|--force ", "Force reinstallation", CommandOptionType.NoValue);
 
             app.OnExecute(async () =>

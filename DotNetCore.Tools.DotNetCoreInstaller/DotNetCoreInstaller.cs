@@ -51,10 +51,26 @@ namespace DotNetCore.Tools
             {
                 var assetName = GetAssetName(parms);
                 var dotnetPackageRelativePath = GetDotnetPackageRelativePath(parms);
-
                 var arch = parms.Architecture;
-                var specificVersion = parms.Version;
-                var uri = BuildDownloadLink(parms, parms.Feed, specificVersion, arch);
+
+                parms.Log?.Invoke($"Install of {assetName} {parms.Platform}-{arch} v{parms.Version} requested.");
+
+                var pkgRoot = m_filesystem.Path.Combine(parms.InstallDir, dotnetPackageRelativePath);
+                if (m_filesystem.Directory.Exists(pkgRoot))
+                {
+                    var matchingVersions = m_filesystem.Directory.GetDirectories(pkgRoot, parms.Version + "*");
+                    if (!parms.Force && matchingVersions.Length > 0)
+                    {
+                        // There may be more than one matching version, but there is also
+                        // at least the first one; this message may be incomplete but it
+                        // is true and sufficient for the purpose.
+                        parms.Log?.Invoke($"Skipping installation: {assetName} version {Path.GetFileName(matchingVersions[0])} is already installed at {parms.InstallDir}.");
+                        return;
+                    }
+                }
+
+                var specificVersion = await ResolveVersion(parms, parms.Version);
+                var uri = BuildDownloadLink(parms, parms.CachedFeed, specificVersion, arch);
                 var pkgPath = m_filesystem.Path.Combine(parms.InstallDir, dotnetPackageRelativePath, specificVersion);
 
                 if (!parms.Force && m_filesystem.Directory.Exists(pkgPath))
@@ -85,6 +101,43 @@ namespace DotNetCore.Tools
             }
         }
 
+        private async Task<string> ResolveVersion(DotNetDistributionParameters parms, string requestedVersion)
+        {
+            string resolvedVersion;
+
+            var s = requestedVersion.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
+            if (s.Length == 2)
+            {
+                var channel = requestedVersion;
+
+                parms.Log?.Invoke($"Looking for latest version in series {channel}...");
+
+                var uri = BuildLatestVersionLink(parms, parms.UncachedFeed, channel);
+                var tmpPath = m_filesystem.Path.GetTempFileName();
+
+                await DownloadFile(uri, tmpPath);
+
+                var versionText = m_filesystem.File.ReadAllText(tmpPath);
+
+                var entries = versionText.Split(new string[0], StringSplitOptions.RemoveEmptyEntries);
+
+                var commitHash = entries[0];
+                resolvedVersion = entries[1];
+
+                parms.Log?.Invoke($"Found {resolvedVersion} ({commitHash})");
+            }
+            else if (s.Length == 3)
+            {
+                resolvedVersion = requestedVersion;
+            }
+            else
+            {
+                throw new DotNetCoreInstallerException($"Unhandled or unrecognized requested version syntax: {requestedVersion}");
+            }
+
+            return resolvedVersion;
+        }
+
         private string GetAssetName(DotNetDistributionParameters parms)
         {
             switch (parms.Runtime)
@@ -96,7 +149,7 @@ namespace DotNetCore.Tools
                     return "ASP.NET Core Runtime";
 
                 default:
-                    throw new DotNetCoreInstallerException("Unhandled value for DotNetDistributionParameters.Runtime: " + parms.Runtime);
+                    throw BadRuntime(parms.Runtime);
             }
         }
 
@@ -111,7 +164,7 @@ namespace DotNetCore.Tools
                     return m_filesystem.Path.Combine("shared", "Microsoft.AspNetCore.App");
 
                 default:
-                    throw new DotNetCoreInstallerException("Unhandled value for DotNetDistributionParameters.Runtime: " + parms.Runtime);
+                    throw BadRuntime(parms.Runtime);
             }
         }
 
@@ -124,7 +177,7 @@ namespace DotNetCore.Tools
             else if (platform == DotNetPlatform.MacOS || platform == DotNetPlatform.Linux)
                 return "tar.gz";
             else
-                throw new DotNetCoreInstallerException("Unhandled value for DotNetDistributionParameters.Platform: " + platform);
+                throw BadPlatform(platform);
         }
 
         private Uri BuildDownloadLink(DotNetDistributionParameters parms, string feed, string specificVersion, string arch)
@@ -140,9 +193,32 @@ namespace DotNetCore.Tools
                     return new Uri($"{feed}/aspnetcore/Runtime/{specificVersion}/aspnetcore-runtime-{specificVersion}-{parms.Platform}-{arch}.{ext}");
 
                 default:
-                    throw new DotNetCoreInstallerException("Unhandled value for DotNetDistributionParameters.Runtime: " + parms.Runtime);
+                    throw BadRuntime(parms.Runtime);
             }
         }
+
+        private Uri BuildLatestVersionLink(DotNetDistributionParameters parms, string feed, string channel)
+        {
+            var ext = GetArchiveExtension(parms);
+    
+            switch (parms.Runtime)
+            {
+                case DotNetRuntime.NETCore:
+                    return new Uri($"{feed}/Runtime/{channel}/latest.version");
+
+                case DotNetRuntime.AspNetCore:
+                    return new Uri($"{feed}/aspnetcore/Runtime/{channel}/latest.version");
+
+                default:
+                    throw BadRuntime(parms.Runtime);
+            }
+        }
+
+        private static Exception BadRuntime(DotNetRuntime runtime) =>
+            new DotNetCoreInstallerException($"Unhandled value for DotNetDistributionParameters.Runtime: {runtime}");
+
+        private static Exception BadPlatform(string platform) =>
+            throw new DotNetCoreInstallerException($"Unhandled value for DotNetDistributionParameters.Platform: {platform}");
     }
 
     internal static class Util
@@ -202,13 +278,6 @@ namespace DotNetCore.Tools
         AspNetCore,
     }
 
-    //public static class DotNetChannels
-    //{
-    //    public static string v1 = "1.0";
-    //    public static string v2 = "2.0";
-    //    public static string LTS = "LTS";
-    //}
-
     public static class DotNetArchitecture
     {
         public static string x64 = "x64";
@@ -225,29 +294,86 @@ namespace DotNetCore.Tools
 
     public class DotNetDistributionParameters
     {
-        public static string DefaultFeed = "https://dotnetcli.azureedge.net/dotnet";
+        public static string DefaultCachedFeed = "https://dotnetcli.azureedge.net/dotnet";
+        public static string DefaultUncachedFeed = "https://dotnetcli.blob.core.windows.net/dotnet";
 
+        /// <summary>
+        /// Constructs parameters for distribution with required parameters.  Additional parameters
+        /// may be specified
+        /// </summary>
+        /// <param name="installDir">
+        /// The location to install the shared runtime.
+        /// </param>
+        /// <param name="platform">
+        /// The platform to install.
+        /// </param>
+        /// <param name="architecture"></param>
+        /// <param name="version"></param>
         public DotNetDistributionParameters(string installDir, string platform, string architecture, string version)
         {
-            InstallDir = installDir;
-            Platform = platform;
-            Architecture = architecture;
-            Version = version;
+            InstallDir = installDir ?? throw new ArgumentNullException(nameof(installDir));
+            Platform = platform ?? throw new ArgumentNullException(nameof(platform));
+            Architecture = architecture ?? throw new ArgumentNullException(nameof(architecture));
+            Version = version ?? throw new ArgumentNullException(nameof(version));
         }
 
+        /// <summary>
+        /// The location to install the shared runtime.  Set via the constructor.
+        /// </summary>
         public string InstallDir { get; }
+
+        /// <summary>
+        /// The platform to install a runtime for.  See <see cref="DotNetPlatform"/>.
+        /// </summary>
         public string Platform { get; }
+
+        /// <summary>
+        /// The architecture to install a runtime for.  See <see cref="DotNetArchitecture"/>.
+        /// </summary>
         public string Architecture { get; }
-        public string Version { get; set; }
 
-        // public string Channel { get; set; } = DotNetChannels.LTS;
+        /// <summary>
+        /// The version to install.  Set via the constructor.  Must either
+        /// be a specific 3-component version (e.g., 2.1.3) or a 2-component
+        /// version (e.g. 2.1), meaning to install the latest runtime in that
+        /// family.
+        /// </summary>
+        public string Version { get; }
 
+        /// <summary>
+        /// The runtime to install.  By default, the platform is .NET Core;
+        /// change this to install ASP.Net or, in the future, other supported
+        /// platform runtimes.  See <see cref="DotNetRuntime"/>.
+        /// </summary>
         public DotNetRuntime Runtime { get; set; } = DotNetRuntime.NETCore;
 
-        public string Feed { get; set; } = DefaultFeed;
+        /// <summary>
+        /// The cached (CDN) feed to download runtimes from.
+        /// </summary>
+        public string CachedFeed { get; set; } = DefaultCachedFeed;
 
+        /// <summary>
+        /// The uncached feed to download runtimes from; used to determine
+        /// what the latest version of a runtime is.
+        /// </summary>
+        public string UncachedFeed { get; set; } = DefaultUncachedFeed;
+
+        /// <summary>
+        /// Set to true to force the runtime to be (re)downloaded and (re)installed
+        /// even if it already appears to be present.
+        /// </summary>
+        /// <remarks>
+        /// If the runtime wasn't present,
+        /// has no effect.  Normally, when this isn't set to true, if the runtime
+        /// appears to have been previously installed the install will exit early
+        /// without any network activity.
+        /// </remarks>
         public bool Force { get; set; } = false;
 
+        /// <summary>
+        /// Set this to a delegate that will receive log output during the install.
+        /// If not set, no log output will be provided.
+        /// </summary>
         public Action<string> Log { get; set; }
     }
 }

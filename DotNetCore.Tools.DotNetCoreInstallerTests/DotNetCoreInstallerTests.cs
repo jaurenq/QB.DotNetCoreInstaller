@@ -108,7 +108,28 @@ namespace DotNetCoreInstallerTests
         }
 
         [Fact]
-        public async void ExitsEarlyIfDirectoryExists()
+        public async void LooksUpLatestVersionInSeriesWhenRequested()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, "2.0");
+            await InstallsMocked(parms, expectsLatestVersionLookup: true);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("2")]
+        [InlineData("2.")]
+        [InlineData("2.3.2.1")]
+        [InlineData("bob")]
+        public async void ThrowsWithBadVersionNumber(string badVersion)
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, badVersion);
+            var exc = await Assert.ThrowsAsync<DotNetCoreInstallerException>(async () => await InstallsMocked(parms, failExtract: true));
+
+            Assert.Contains("version", exc.Message);
+        }
+
+        [Fact]
+        public async void ExitsEarlyIfDirectoryExistsWithExactVersion()
         {
             var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, DefaultTestRelease);
 
@@ -121,7 +142,28 @@ namespace DotNetCoreInstallerTests
         }
 
         [Fact]
-        public async void RunsEvenIfDirectoryExistsIfForced()
+        public async void ExitsEarlyIfDirectoryExistsWithAnyCompatibleVersion()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, "2.0");
+
+            var logMock = new Mock<Action<string>>();
+            parms.Log = logMock.Object;
+
+            await InstallsMocked(parms, earlyExit: true);
+
+            logMock.Verify(l => l(It.Is<string>(s => s.Contains("is already installed"))));
+        }
+
+        [Fact]
+        public async void RunsEvenIfCompatibleVersionDirectoryExistsIfForced()
+        {
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, "2.0");
+            parms.Force = true;
+            await InstallsMocked(parms, forcedOverwrite: true, expectsLatestVersionLookup: true);
+        }
+
+        [Fact]
+        public async void RunsEvenIfExactVersionDirectoryExistsIfForced()
         {
             var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x86, DefaultTestRelease);
             parms.Force = true;
@@ -137,7 +179,9 @@ namespace DotNetCoreInstallerTests
             Assert.Contains("failed to install", exc.Message);
         }
 
-        private async Task InstallsMocked(DotNetDistributionParameters parms, bool earlyExit = false, bool forcedOverwrite = false, bool failExtract = false)
+        private async Task InstallsMocked(
+            DotNetDistributionParameters parms,
+            bool earlyExit = false, bool forcedOverwrite = false, bool failExtract = false, bool expectsLatestVersionLookup = false)
         {
             var platform = parms.Platform;
             var arch = parms.Architecture;
@@ -156,9 +200,29 @@ namespace DotNetCoreInstallerTests
             var archiveExt = (parms.Platform == DotNetPlatform.Windows) ? "zip" : "tar.gz";
 
             var assetDir = (parms.Runtime == DotNetRuntime.NETCore) ? "Microsoft.NETCore.App" : "Microsoft.AspNetCore.App";
+            var expectedPackageRoot = Path.Combine(InstallDir, "shared", assetDir);
+
+            mockDirectory.Setup(d => d.Exists(expectedPackageRoot)).Returns(true); // Just test the true case; the false case is uninteresting and the code is covered by other tests anyway.
+            mockDirectory.Setup(d => d.GetDirectories(expectedPackageRoot, parms.Version + "*")).Returns(
+                earlyExit ? new [] { version + ".3" } : new string[0]
+            );
+
+            if (expectsLatestVersionLookup)
+            {
+                var expectedLatestUri = (parms.Runtime == DotNetRuntime.NETCore)
+                    ? new Uri($"{DotNetDistributionParameters.DefaultUncachedFeed}/Runtime/{version}/latest.version")
+                    : new Uri($"{DotNetDistributionParameters.DefaultUncachedFeed}/aspnetcore/Runtime/{version}/latest.version");
+
+                mockDownloader.Setup(d => d(expectedLatestUri, It.IsAny<string>())).Returns(Task.CompletedTask);            // Download latest.version File
+
+                version = version + ".3"; // Pretend that the latest of, e.g. 2.2, is 2.2.3.
+
+                mockFile.Setup(f => f.ReadAllText(It.IsAny<string>())).Returns($"some-hash\n{version}");
+            }
+
             var expectedUri = (parms.Runtime == DotNetRuntime.NETCore)
-                ? new Uri($"{DotNetDistributionParameters.DefaultFeed}/Runtime/{version}/dotnet-runtime-{version}-{platform}-{arch}.{archiveExt}")
-                : new Uri($"{DotNetDistributionParameters.DefaultFeed}/aspnetcore/Runtime/{version}/aspnetcore-runtime-{version}-{platform}-{arch}.{archiveExt}");
+                ? new Uri($"{DotNetDistributionParameters.DefaultCachedFeed}/Runtime/{version}/dotnet-runtime-{version}-{platform}-{arch}.{archiveExt}")
+                : new Uri($"{DotNetDistributionParameters.DefaultCachedFeed}/aspnetcore/Runtime/{version}/aspnetcore-runtime-{version}-{platform}-{arch}.{archiveExt}");
             var expectedInstallPath = Path.Combine(InstallDir, "shared", assetDir, version);
 
             if (earlyExit)
@@ -175,7 +239,7 @@ namespace DotNetCoreInstallerTests
                 mockDownloader.Setup(d => d(expectedUri, It.IsAny<string>())).Returns(Task.CompletedTask);                  // Download
                 mockExtractor.Setup(e => e(It.IsAny<string>(), parms.InstallDir, forcedOverwrite))                          // Extract
                     .Returns(Task.CompletedTask);
-                mockFile.Setup(d => d.Delete(It.IsAny<string>()));                                                          // Deleting the temporary zip file.
+                mockFile.Setup(f => f.Delete(It.IsAny<string>()));                                                          // Deleting the temporary zip file.
             }
 
             await installer.InstallStandalone(parms);
@@ -190,18 +254,33 @@ namespace DotNetCoreInstallerTests
         /// You can run it manually by running the suite with an attached debugger.
         /// </summary>
         [FactRunnableInDebugOnly]
-        public async void InstallsForReal()
+        public async void InstallsForRealWithSpecificVersion()
         {
             var platform = DotNetPlatform.Windows;
             var arch = DotNetArchitecture.x64;
-            var version = "2.1.0";
+            var version = "2.1.4";
 
-            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x64, DefaultTestRelease);
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x64, version);
             var installer = new DotNetCoreInstaller();
             await installer.InstallStandalone(parms);
 
             var expectedInstallPath = Path.Combine(InstallDir, "shared", "Microsoft.NETCore.App", version);
             Assert.True(Directory.Exists(expectedInstallPath));
+        }
+
+        [FactRunnableInDebugOnly]
+        public async void InstallsForRealWithLatestVersion()
+        {
+            var platform = DotNetPlatform.Windows;
+            var arch = DotNetArchitecture.x64;
+            var version = "2.1";
+
+            var parms = new DotNetDistributionParameters(InstallDir, DotNetPlatform.Windows, DotNetArchitecture.x64, version);
+            var installer = new DotNetCoreInstaller();
+            await installer.InstallStandalone(parms);
+
+            var matchingDirectories = Directory.GetDirectories(Path.Combine(InstallDir, "shared", "Microsoft.NETCore.App"), version + "*");
+            Assert.True(matchingDirectories.Length == 1 && Directory.Exists(matchingDirectories[0]));
         }
     }
 
