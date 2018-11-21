@@ -6,4 +6,5 @@ os:
   - osx
 script:
   - dotnet build 
-  - dotnet test DotNetCore.Tools.DotNetCoreInstallerTests/DotNetCore.Tools.DotNetCoreInstallerTests.csproj /p:CollectCoverage=true
+  - dotnet test DotNetCore.Tools.DotNetCoreInstallerTests/DotNetCore.Tools.DotNetCoreInstallerTests.csproj /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:Exclude="[*]DotNetCore.Tools.Util"
+  - bash <(curl -s https://codecov.io/bash)
