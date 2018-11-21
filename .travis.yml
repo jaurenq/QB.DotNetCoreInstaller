@@ -7,4 +7,4 @@ os:
 script:
   - dotnet build 
   - dotnet test DotNetCore.Tools.DotNetCoreInstallerTests/DotNetCore.Tools.DotNetCoreInstallerTests.csproj /p:CollectCoverage=true
-  - bash < (curl -s https://codecov.io/bash)
+  - bash <(curl -s https://codecov.io/bash)
