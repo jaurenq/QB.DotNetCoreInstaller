@@ -251,12 +251,15 @@ namespace DotNetCore.Tools
                         if (reader.Entry.IsDirectory)
                             continue;
 
-                        var path = Path.GetFullPath(Path.Combine(outPath, reader.Entry.Key));
-                        var dir = Path.GetDirectoryName(path);
+                        // NOTE: Forward slashes are allowed on Windows and required on Unixes,
+                        // so just always use them here instead of trying to adapt.
+                        var filePath = Path.GetFullPath(Path.Combine(outPath, reader.Entry.Key)).Replace('\\', '/');
+                        
+                        var dir = Path.GetDirectoryName(filePath);
                         if (!Directory.Exists(dir))
                             Directory.CreateDirectory(dir);
 
-                        reader.WriteEntryToDirectory(outPath, extractOptions);
+                        reader.WriteEntryToFile(filePath, extractOptions);
                     }
                 }
             });
