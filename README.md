@@ -5,6 +5,8 @@ standalone installations of .NET Core.
 
 [![Build Status](https://travis-ci.com/jaurenq/QB.DotNetCoreInstaller.svg?branch=master)](https://travis-ci.com/jaurenq/QB.DotNetCoreInstaller)
 
+[![Code Coverage](https://codecov.io/gh/jaurenq/QB.DotNetCoreInstaller/branch/master/graph/badge.svg)](https://codecov.io/gh/jaurenq/QB.DotNetCoreInstaller)
+
 ## What Is This?
 
 This tool does essentially the same thing as the .NET shared-runtime install scripts
