@@ -10,6 +10,9 @@ standalone installations of .NET Core.
     <a href="https://codecov.io/gh/jaurenq/QB.DotNetCoreInstaller" alt="Code Coverage">
         <img src="https://codecov.io/gh/jaurenq/QB.DotNetCoreInstaller/branch/master/graph/badge.svg" />
     </a>
+    <a href="https://www.nuget.org/packages/QB.DotNetCoreInstaller/" alt="NuGet">
+        <img src="https://buildstats.info/nuget/QB.DotNetCoreInstaller" />
+    </a>
 </p>
 
 ## What Is This?
