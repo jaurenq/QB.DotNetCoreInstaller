@@ -7,3 +7,4 @@ os:
 script:
   - dotnet build 
   - dotnet test DotNetCore.Tools.DotNetCoreInstallerTests/DotNetCore.Tools.DotNetCoreInstallerTests.csproj /p:CollectCoverage=true
+  - codecov
