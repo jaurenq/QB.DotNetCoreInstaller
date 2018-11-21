@@ -81,6 +81,9 @@ namespace DotNetCore.Tools
 
                 parms.Log?.Invoke($"Installing {assetName} {parms.Platform}-{arch} v{specificVersion} to {parms.InstallDir}...");
 
+                // NOTE: Forward slashes are allowed on Windows and required on Unixes,
+                // so just always use them here instead of trying to adapt.
+                var installDir = Path.GetFullPath(parms.InstallDir).Replace('\\', '/');
                 m_filesystem.Directory.CreateDirectory(parms.InstallDir);
 
                 var zipPath = m_filesystem.Path.GetTempFileName() + GetArchiveExtension(parms);
