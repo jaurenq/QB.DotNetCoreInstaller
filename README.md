@@ -3,9 +3,14 @@
 A library and [.NET Core Tool](https://github.com/natemcmaster/dotnet-tools) for automating
 standalone installations of .NET Core.
 
-[![Build Status](https://travis-ci.com/jaurenq/QB.DotNetCoreInstaller.svg?branch=master)](https://travis-ci.com/jaurenq/QB.DotNetCoreInstaller)
-
-[![Code Coverage](https://codecov.io/gh/jaurenq/QB.DotNetCoreInstaller/branch/master/graph/badge.svg)](https://codecov.io/gh/jaurenq/QB.DotNetCoreInstaller)
+<p align="center">
+    <a href="https://travis-ci.com/jaurenq/QB.DotNetCoreInstaller" alt="Build Status">
+        <img src="https://travis-ci.com/jaurenq/QB.DotNetCoreInstaller.svg?branch=master" />
+    </a>
+    <a href="https://codecov.io/gh/jaurenq/QB.DotNetCoreInstaller" alt="Code Coverage">
+        <img src="https://codecov.io/gh/jaurenq/QB.DotNetCoreInstaller/branch/master/graph/badge.svg" />
+    </a>
+</p>
 
 ## What Is This?
 
