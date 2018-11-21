@@ -13,7 +13,7 @@
 
     <PackageProjectUrl>https://github.com/jaurenq/QB.DotNetCoreInstaller</PackageProjectUrl>
     <RepositoryUrl>https://github.com/jaurenq/QB.DotNetCoreInstaller</RepositoryUrl>
-    <Version>0.1.5</Version>
+    <Version>0.1.6</Version>
     <Copyright>Copyright 2018 (c) Stephen Quattlebaum</Copyright>
     <PackageTags>dotnet install shared standalone</PackageTags>
     
