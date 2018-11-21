@@ -6,4 +6,4 @@ os:
   - osx
 script:
   - dotnet build 
-  - dotnet test DotNetCore.Tools.DotNetCoreInstallerTests/DotNetCore.Tools.DotNetCoreInstallerTests.csproj
+  - dotnet test DotNetCore.Tools.DotNetCoreInstallerTests/DotNetCore.Tools.DotNetCoreInstallerTests.csproj /p:CollectCoverage=true
