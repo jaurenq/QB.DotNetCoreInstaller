@@ -1,6 +1,6 @@
 language: csharp
 mono: none
 dotnet: 2.1.3
-script
+script:
   - dotnet build 
   - dotnet test DotNetCore.Tools.DotNetCoreInstallerTests/DotNetCore.Tools.DotNetCoreInstallerTests.csproj
